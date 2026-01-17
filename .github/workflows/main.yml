@@ -1,0 +1,45 @@
+name: DataHub Metadata Build & Validate
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'metadata/**'
+      - 'dbt_project/**'
+
+jobs:
+  datahub-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install DataHub CLI
+        run: |
+          pip install --upgrade pip
+          pip install 'acryl-datahub[dbt,datahub-rest]'
+
+      - name: Validate Business Glossary
+        run: |
+          # Validates that your YAML glossary files follow the DataHub schema
+          datahub check glossary ./metadata/glossary.yaml
+
+      - name: Validate dbt Manifest
+        run: |
+          # Ensures your dbt artifacts are present and readable by DataHub
+          # Replace with your actual dbt manifest path
+          datahub check dbt --manifest ./target/manifest.json
+
+      - name: Dry-Run Ingestion
+        env:
+          DATAHUB_GMS_TOKEN: ${{ secrets.DATAHUB_GMS_TOKEN }}
+          DATAHUB_GMS_URL: ${{ secrets.DATAHUB_GMS_URL }}
+        run: |
+          # The --dry-run flag tests the connection and mapping without writing data
+          datahub ingest -c ./metadata/ingestion_recipe.yaml --dry-run
